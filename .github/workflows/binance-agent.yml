@@ -48,10 +48,15 @@ jobs:
         run: |
           git config user.name "Binance AI Agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add posted_news.json
-          if git diff --cached --quiet; then
-            echo "No history changes to commit."
+
+          if [ -f posted_news.json ]; then
+            git add posted_news.json
+            if git diff --cached --quiet; then
+              echo "No history changes to commit."
+            else
+              git commit -m "Update news history"
+              git push
+            fi
           else
-            git commit -m "Update news history"
-            git push
+            echo "posted_news.json was not created."
           fi
