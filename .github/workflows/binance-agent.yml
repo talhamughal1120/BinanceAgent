@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Binance Square skill
         run: |
-          npx skills add https://github.com/binance/binance-skills-hub/tree/main/skills/binance/square-post
+          npx skills add https://github.com/binance/binance-skills-hub/tree/main/skills/binance/square-post --agent "*" -y
 
       - name: Run Binance Agent
         env:
