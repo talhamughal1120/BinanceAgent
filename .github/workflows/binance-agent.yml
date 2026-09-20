@@ -2,9 +2,13 @@ name: Binance Square AI Agent
 
 on:
   workflow_dispatch:
+
   schedule:
     - cron: "0 10,12,15,18,21 * * *"
       timezone: "Asia/Karachi"
+
+permissions:
+  contents: write
 
 jobs:
   run-agent:
@@ -22,24 +26,32 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Install Binance Square skill
-        run: npx skills add https://github.com/binance/binance-skills-hub/tree/main/skills/binance/square-post
+        run: |
+          npx skills add https://github.com/binance/binance-skills-hub/tree/main/skills/binance/square-post
 
       - name: Run Binance Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
-        run: python agent.py
+        run: |
+          python agent.py
 
       - name: Save news history
         run: |
           git config user.name "Binance AI Agent"
-          git config user.email "actions@github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add posted_news.json
-          git diff --cached --quiet || git commit -m "Update news history"
-          git push
+          if git diff --cached --quiet; then
+            echo "No history changes to commit."
+          else
+            git commit -m "Update news history"
+            git push
+          fi
