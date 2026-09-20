@@ -12,33 +12,65 @@ from html import unescape
 # SETTINGS
 # =========================
 
-SKILL_DIR = os.path.expanduser(r"~\.agents\skills\square-post")
-HISTORY_FILE = "posted_news.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Works on Windows and GitHub Linux
+SKILL_DIR = os.path.join(
+    os.path.expanduser("~"),
+    ".agents",
+    "skills",
+    "square-post"
+)
+
+HISTORY_FILE = os.path.join(
+    BASE_DIR,
+    "posted_news.json"
+)
 
 RSS_SOURCES = [
-    ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-    ("Cointelegraph", "https://cointelegraph.com/rss"),
+    (
+        "CoinDesk",
+        "https://www.coindesk.com/arc/outboundfeeds/rss/"
+    ),
+    (
+        "Cointelegraph",
+        "https://cointelegraph.com/rss"
+    ),
 ]
 
 GEMINI_MODEL = "gemini-3.6-flash"
 
-# Broad market coins are used ONLY when the article
-# does not contain enough directly relevant crypto assets.
+# OpenAI fallback model
+OPENAI_MODEL = "gpt-5.6-luna"
+
+# Broad market coins are used ONLY when
+# the article does not contain enough directly
+# relevant crypto assets.
 BROAD_MARKET_COINS = [
     "$BTC",
     "$ETH",
     "$BNB",
 ]
 
+
 # =========================
-# LOAD API KEY
+# LOAD API KEYS
 # =========================
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY"
+)
 
-if not GEMINI_API_KEY:
-    print("❌ GEMINI_API_KEY nahi mili.")
-    print("CMD dobara open karke agent run karo.")
+OPENAI_API_KEY = os.getenv(
+    "OPENAI_API_KEY"
+)
+
+if not GEMINI_API_KEY and not OPENAI_API_KEY:
+
+    print(
+        "❌ GEMINI_API_KEY aur OPENAI_API_KEY dono nahi mili."
+    )
+
     raise SystemExit
 
 
@@ -47,32 +79,59 @@ if not GEMINI_API_KEY:
 # =========================
 
 def load_history():
-    if not os.path.exists(HISTORY_FILE):
+
+    if not os.path.exists(
+        HISTORY_FILE
+    ):
         return []
 
     try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+
+        with open(
+            HISTORY_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             data = json.load(f)
 
-            if isinstance(data, list):
+            if isinstance(
+                data,
+                list
+            ):
                 return data
 
             return []
 
     except Exception:
+
         return []
 
 
 def save_history(history):
+
     history = history[-500:]
 
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2)
+    with open(
+        HISTORY_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            history,
+            f,
+            indent=2,
+            ensure_ascii=False
+        )
 
 
 def news_id(title):
+
     return hashlib.sha256(
-        title.lower().strip().encode("utf-8")
+        title.lower()
+        .strip()
+        .encode("utf-8")
     ).hexdigest()
 
 
@@ -81,16 +140,23 @@ def news_id(title):
 # =========================
 
 def clean_html(text):
+
     if not text:
         return ""
 
     text = unescape(text)
 
-    # Remove HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(
+        r"<[^>]+>",
+        " ",
+        text
+    )
 
-    # Remove excessive whitespace
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
@@ -99,7 +165,10 @@ def clean_html(text):
 # RSS NEWS
 # =========================
 
-def fetch_rss(source_name, url):
+def fetch_rss(
+    source_name,
+    url
+):
 
     try:
 
@@ -113,17 +182,34 @@ def fetch_rss(source_name, url):
 
         response.raise_for_status()
 
-        root = ET.fromstring(response.content)
+        root = ET.fromstring(
+            response.content
+        )
 
         articles = []
 
-        for item in root.findall(".//item")[:10]:
+        for item in root.findall(
+            ".//item"
+        )[:10]:
 
-            title = item.findtext("title", "").strip()
-            link = item.findtext("link", "").strip()
-            description = item.findtext("description", "").strip()
+            title = item.findtext(
+                "title",
+                ""
+            ).strip()
 
-            description = clean_html(description)
+            link = item.findtext(
+                "link",
+                ""
+            ).strip()
+
+            description = item.findtext(
+                "description",
+                ""
+            ).strip()
+
+            description = clean_html(
+                description
+            )
 
             if title and link:
 
@@ -134,13 +220,18 @@ def fetch_rss(source_name, url):
                     "description": description
                 })
 
-        print(f"{source_name}: {len(articles)} articles")
+        print(
+            f"{source_name}: {len(articles)} articles"
+        )
 
         return articles
 
     except Exception as e:
 
-        print(f"❌ {source_name} error:", e)
+        print(
+            f"❌ {source_name} error:",
+            e
+        )
 
         return []
 
@@ -156,7 +247,9 @@ def get_news():
             url
         )
 
-        all_articles.extend(articles)
+        all_articles.extend(
+            articles
+        )
 
     return all_articles
 
@@ -165,9 +258,12 @@ def get_news():
 # REMOVE EXACT DUPLICATES
 # =========================
 
-def remove_duplicates(articles):
+def remove_duplicates(
+    articles
+):
 
     seen = set()
+
     unique = []
 
     for article in articles:
@@ -178,8 +274,13 @@ def remove_duplicates(articles):
 
         if article_id not in seen:
 
-            seen.add(article_id)
-            unique.append(article)
+            seen.add(
+                article_id
+            )
+
+            unique.append(
+                article
+            )
 
     return unique
 
@@ -189,16 +290,46 @@ def remove_duplicates(articles):
 # =========================
 
 STOP_WORDS = {
-    "the", "and", "for", "with", "from",
-    "that", "this", "into", "after",
-    "over", "under", "about", "could",
-    "would", "should", "will", "have",
-    "has", "been", "are", "was", "were",
-    "its", "their", "they", "than",
-    "what", "how", "why", "who",
-    "new", "news", "says", "said",
-    "according", "latest", "report",
-    "reports", "amid", "more"
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "into",
+    "after",
+    "over",
+    "under",
+    "about",
+    "could",
+    "would",
+    "should",
+    "will",
+    "have",
+    "has",
+    "been",
+    "are",
+    "was",
+    "were",
+    "its",
+    "their",
+    "they",
+    "than",
+    "what",
+    "how",
+    "why",
+    "who",
+    "new",
+    "news",
+    "says",
+    "said",
+    "according",
+    "latest",
+    "report",
+    "reports",
+    "amid",
+    "more"
 }
 
 
@@ -217,31 +348,57 @@ def title_words(title):
     }
 
 
-def topic_similarity(title1, title2):
+def topic_similarity(
+    title1,
+    title2
+):
 
-    words1 = title_words(title1)
-    words2 = title_words(title2)
+    words1 = title_words(
+        title1
+    )
+
+    words2 = title_words(
+        title2
+    )
 
     if not words1 or not words2:
         return 0
 
-    intersection = words1.intersection(words2)
-    smaller = min(len(words1), len(words2))
+    intersection = (
+        words1.intersection(
+            words2
+        )
+    )
+
+    smaller = min(
+        len(words1),
+        len(words2)
+    )
 
     if smaller == 0:
         return 0
 
-    return len(intersection) / smaller
+    return (
+        len(intersection)
+        / smaller
+    )
 
 
-def is_same_topic(article, recent_articles):
+def is_same_topic(
+    article,
+    recent_articles
+):
 
-    current_title = article["title"]
+    current_title = article[
+        "title"
+    ]
 
-    # Compare against recent published titles.
     for old_article in recent_articles[-30:]:
 
-        if isinstance(old_article, dict):
+        if isinstance(
+            old_article,
+            dict
+        ):
 
             old_title = old_article.get(
                 "title",
@@ -249,8 +406,7 @@ def is_same_topic(article, recent_articles):
             )
 
         else:
-            # Old history may contain IDs from
-            # the previous version.
+
             continue
 
         if not old_title:
@@ -261,7 +417,6 @@ def is_same_topic(article, recent_articles):
             old_title
         )
 
-        # High title overlap = probably same story/topic
         if similarity >= 0.60:
 
             print(
@@ -287,7 +442,9 @@ def is_same_topic(article, recent_articles):
 # ARTICLE CONTENT
 # =========================
 
-def get_article_context(article):
+def get_article_context(
+    article
+):
 
     title = article.get(
         "title",
@@ -411,17 +568,24 @@ COIN_MAP = {
 }
 
 
-def detect_relevant_coins(article):
+def detect_relevant_coins(
+    article
+):
 
     text = (
-        article.get("title", "")
+        article.get(
+            "title",
+            ""
+        )
         + " "
-        + article.get("description", "")
+        + article.get(
+            "description",
+            ""
+        )
     ).lower()
 
     found = []
 
-    # Longer names first
     for name in sorted(
         COIN_MAP.keys(),
         key=len,
@@ -429,23 +593,32 @@ def detect_relevant_coins(article):
     ):
 
         if re.search(
-            r"\b" + re.escape(name) + r"\b",
+            r"\b"
+            + re.escape(name)
+            + r"\b",
             text
         ):
 
-            coin = COIN_MAP[name]
+            coin = COIN_MAP[
+                name
+            ]
 
             if coin not in found:
-                found.append(coin)
+
+                found.append(
+                    coin
+                )
 
     return found
 
 
 # =========================
-# GEMINI
+# AI PROMPT
 # =========================
 
-def generate_post(article):
+def build_prompt(
+    article
+):
 
     article_context = get_article_context(
         article
@@ -463,7 +636,9 @@ def generate_post(article):
 
     else:
 
-        relevant_text = "No specific crypto asset detected."
+        relevant_text = (
+            "No specific crypto asset detected."
+        )
 
     prompt = f"""
 You are a professional crypto news writer for Binance Square.
@@ -502,18 +677,18 @@ IMPORTANT:
 1. Use the most relevant crypto assets connected to the article.
 
 2. If the article directly mentions multiple crypto assets,
-   prioritize those assets.
+prioritize those assets.
 
 3. Do NOT use random coins just to increase engagement.
 
 4. If the article directly mentions only one or two coins,
-   you may use BTC, ETH or BNB as broad market-context
-   cashtags ONLY when the article is clearly related to
-   the broader crypto market, regulation, adoption,
-   blockchain infrastructure or digital assets.
+you may use BTC, ETH or BNB as broad market-context
+cashtags ONLY when the article is clearly related to
+the broader crypto market, regulation, adoption,
+blockchain infrastructure or digital assets.
 
 5. Never claim that a backup/broad-market coin was mentioned
-   in the article if it was not mentioned.
+in the article if it was not mentioned.
 
 6. Do NOT put any dollar cashtag anywhere else in the post.
 
@@ -560,8 +735,6 @@ Include exactly this section:
 
 Then explain why the reported development
 could matter to the crypto/blockchain market.
-
-IMPORTANT:
 
 If the article does not provide enough information
 to explain a specific impact, keep this section
@@ -726,26 +899,55 @@ Source: ORIGINAL_URL
 Return ONLY the final post.
 """
 
+    return prompt
+
+
+# =========================
+# GEMINI AI
+# =========================
+
+def generate_with_gemini(
+    prompt
+):
+
+    if not GEMINI_API_KEY:
+
+        print(
+            "⚠️ GEMINI_API_KEY available nahi."
+        )
+
+        return None
 
     url = (
-        f"https://generativelanguage.googleapis.com/"
+        "https://generativelanguage.googleapis.com/"
         f"v1beta/models/{GEMINI_MODEL}:generateContent"
         f"?key={GEMINI_API_KEY}"
     )
 
     payload = {
+
         "contents": [
+
             {
+
                 "parts": [
+
                     {
                         "text": prompt
                     }
+
                 ]
+
             }
+
         ]
+
     }
 
-    for attempt in range(1, 4):
+    for attempt in range(
+        1,
+        4
+    ):
 
         try:
 
@@ -759,6 +961,7 @@ Return ONLY the final post.
                 timeout=60
             )
 
+            # Temporary server busy
             if response.status_code == 503:
 
                 print(
@@ -766,25 +969,75 @@ Return ONLY the final post.
                 )
 
                 time.sleep(5)
+
                 continue
+
+            # Quota exceeded
+            if response.status_code == 429:
+
+                print(
+                    "⚠️ Gemini quota/rate limit reached."
+                )
+
+                return None
 
             if response.status_code != 200:
 
-                print("❌ Gemini error:")
-                print(response.text)
+                print(
+                    "❌ Gemini error:"
+                )
+
+                print(
+                    response.text
+                )
 
                 return None
 
             data = response.json()
 
-            post = (
-                data["candidates"][0]
-                ["content"]["parts"][0]
-                ["text"]
-                .strip()
+            candidates = data.get(
+                "candidates",
+                []
             )
 
-            return post
+            if not candidates:
+
+                print(
+                    "❌ Gemini ne koi candidate return nahi ki."
+                )
+
+                return None
+
+            parts = candidates[0].get(
+                "content",
+                {}
+            ).get(
+                "parts",
+                []
+            )
+
+            if not parts:
+
+                print(
+                    "❌ Gemini response empty hai."
+                )
+
+                return None
+
+            post = parts[0].get(
+                "text",
+                ""
+            ).strip()
+
+            if post:
+
+                print(
+                    "✅ Gemini se post generate ho gayi."
+                )
+
+                return post
+
+            return None
 
         except Exception as e:
 
@@ -794,7 +1047,233 @@ Return ONLY the final post.
             )
 
             if attempt < 3:
+
                 time.sleep(5)
+
+    return None
+
+
+# =========================
+# OPENAI FALLBACK
+# =========================
+
+def generate_with_openai(
+    prompt
+):
+
+    if not OPENAI_API_KEY:
+
+        print(
+            "❌ OPENAI_API_KEY available nahi."
+        )
+
+        return None
+
+    print(
+        f"OpenAI fallback: {OPENAI_MODEL}"
+    )
+
+    url = (
+        "https://api.openai.com/v1/responses"
+    )
+
+    headers = {
+
+        "Authorization":
+            f"Bearer {OPENAI_API_KEY}",
+
+        "Content-Type":
+            "application/json"
+
+    }
+
+    payload = {
+
+        "model":
+            OPENAI_MODEL,
+
+        "input":
+            prompt,
+
+        "max_output_tokens":
+            1200
+
+    }
+
+    for attempt in range(
+        1,
+        3
+    ):
+
+        try:
+
+            print(
+                f"OpenAI attempt {attempt}/2..."
+            )
+
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=90
+            )
+
+            if response.status_code in (
+                429,
+                500,
+                502,
+                503,
+                504
+            ):
+
+                print(
+                    "⚠️ OpenAI temporary error:"
+                    f" {response.status_code}"
+                )
+
+                if attempt < 2:
+
+                    time.sleep(5)
+
+                    continue
+
+            if response.status_code != 200:
+
+                print(
+                    "❌ OpenAI error:"
+                )
+
+                print(
+                    response.text
+                )
+
+                return None
+
+            data = response.json()
+
+            # Responses API output_text
+            post = data.get(
+                "output_text",
+                ""
+            ).strip()
+
+            # Fallback parser in case
+            # output_text is not present.
+            if not post:
+
+                output = data.get(
+                    "output",
+                    []
+                )
+
+                collected = []
+
+                for item in output:
+
+                    if item.get(
+                        "type"
+                    ) != "message":
+
+                        continue
+
+                    for content in item.get(
+                        "content",
+                        []
+                    ):
+
+                        if content.get(
+                            "type"
+                        ) == "output_text":
+
+                            text = content.get(
+                                "text",
+                                ""
+                            )
+
+                            if text:
+                                collected.append(
+                                    text
+                                )
+
+                post = "\n".join(
+                    collected
+                ).strip()
+
+            if post:
+
+                print(
+                    "✅ OpenAI se post generate ho gayi."
+                )
+
+                return post
+
+            print(
+                "❌ OpenAI response empty hai."
+            )
+
+            return None
+
+        except Exception as e:
+
+            print(
+                "❌ OpenAI exception:",
+                e
+            )
+
+            if attempt < 2:
+
+                time.sleep(5)
+
+    return None
+
+
+# =========================
+# AI GENERATION
+# =========================
+
+def generate_post(
+    article
+):
+
+    prompt = build_prompt(
+        article
+    )
+
+    # ---------------------------------
+    # FIRST: GEMINI
+    # ---------------------------------
+
+    post = generate_with_gemini(
+        prompt
+    )
+
+    if post:
+
+        return post
+
+    # ---------------------------------
+    # SECOND: OPENAI FALLBACK
+    # ---------------------------------
+
+    print(
+        "\n🔄 Gemini failed."
+    )
+
+    print(
+        "🔄 OpenAI fallback start ho raha hai..."
+    )
+
+    post = generate_with_openai(
+        prompt
+    )
+
+    if post:
+
+        return post
+
+    print(
+        "❌ Gemini aur OpenAI dono se post generate nahi hui."
+    )
 
     return None
 
@@ -813,6 +1292,7 @@ BLOCKED_PHRASES = [
 
     "guaranteed profit",
     "guaranteed profits",
+
     "guaranteed return",
     "guaranteed returns",
 
@@ -832,13 +1312,16 @@ BLOCKED_PHRASES = [
 ]
 
 
-def contains_blocked_language(post):
+def contains_blocked_language(
+    post
+):
 
     lower_post = post.lower()
 
     for phrase in BLOCKED_PHRASES:
 
         if phrase in lower_post:
+
             return True, phrase
 
     return False, None
@@ -848,11 +1331,12 @@ def contains_blocked_language(post):
 # REMOVE MARKDOWN HEADERS
 # =========================
 
-def clean_generated_post(post):
+def clean_generated_post(
+    post
+):
 
     post = post.strip()
 
-    # Remove accidental code fences
     post = re.sub(
         r"^```(?:text|markdown)?",
         "",
@@ -874,9 +1358,11 @@ def clean_generated_post(post):
 # CASHTAG CHECK / FIX
 # =========================
 
-def fix_cashtags(post, article):
+def fix_cashtags(
+    post,
+    article
+):
 
-    # Find all dollar cashtags
     found = re.findall(
         r"\$[A-Za-z]{2,10}\b",
         post
@@ -889,9 +1375,11 @@ def fix_cashtags(post, article):
         coin = coin.upper()
 
         if coin not in cashtags:
-            cashtags.append(coin)
 
-    # Find coins actually connected to article
+            cashtags.append(
+                coin
+            )
+
     article_coins = detect_relevant_coins(
         article
     )
@@ -903,42 +1391,49 @@ def fix_cashtags(post, article):
 
         if coin not in final_coins:
 
-            final_coins.append(coin)
+            final_coins.append(
+                coin
+            )
 
         if len(final_coins) == 3:
+
             break
 
-    # Second: keep generated relevant-looking coins
+    # Second: generated coins
     for coin in cashtags:
 
         if coin not in final_coins:
 
-            final_coins.append(coin)
+            final_coins.append(
+                coin
+            )
 
         if len(final_coins) == 3:
+
             break
 
-    # Third: broad market context only
-    # if article does not provide 3 assets.
+    # Third: broad market
     for coin in BROAD_MARKET_COINS:
 
         if coin not in final_coins:
 
-            final_coins.append(coin)
+            final_coins.append(
+                coin
+            )
 
         if len(final_coins) == 3:
+
             break
 
     final_coins = final_coins[:3]
 
-    # Remove every existing cashtag from the body
+    # Remove every existing cashtag
     clean_post = re.sub(
         r"\$[A-Za-z]{2,10}\b\s*",
         "",
         post
     ).strip()
 
-    # Remove an accidental duplicate leading line
     lines = clean_post.splitlines()
 
     if lines:
@@ -951,6 +1446,7 @@ def fix_cashtags(post, article):
         ):
 
             if "$" in first_line:
+
                 lines = lines[1:]
 
     clean_post = "\n".join(
@@ -970,7 +1466,9 @@ def fix_cashtags(post, article):
 # VALIDATE POST
 # =========================
 
-def validate_post(post):
+def validate_post(
+    post
+):
 
     errors = []
 
@@ -990,7 +1488,10 @@ def validate_post(post):
         coin = coin.upper()
 
         if coin not in unique_cashtags:
-            unique_cashtags.append(coin)
+
+            unique_cashtags.append(
+                coin
+            )
 
     if len(unique_cashtags) != 3:
 
@@ -999,7 +1500,7 @@ def validate_post(post):
         )
 
     # ---------------------------------
-    # Cashtags must be on first line
+    # First line
     # ---------------------------------
 
     lines = post.splitlines()
@@ -1094,10 +1595,11 @@ def validate_post(post):
         )
 
     # ---------------------------------
-    # Guaranteed language variations
+    # Dangerous patterns
     # ---------------------------------
 
     dangerous_patterns = [
+
         r"guaranteed\s+profit",
         r"guaranteed\s+return",
         r"profit\s+guaranteed",
@@ -1105,6 +1607,7 @@ def validate_post(post):
         r"risk[- ]free",
         r"buy\s+now",
         r"sell\s+now",
+
     ]
 
     lower_post = post.lower()
@@ -1127,7 +1630,9 @@ def validate_post(post):
 # PUBLISH TO BINANCE SQUARE
 # =========================
 
-def publish_to_binance(post):
+def publish_to_binance(
+    post
+):
 
     print(
         "\nPublishing to Binance Square..."
@@ -1185,25 +1690,35 @@ def select_article(
     history
 ):
 
-    # Old version of history contains IDs.
-    # New version may contain dictionaries.
     posted_ids = set()
+
     recent_articles = []
 
     for item in history:
 
-        if isinstance(item, str):
+        if isinstance(
+            item,
+            str
+        ):
 
-            posted_ids.add(item)
+            posted_ids.add(
+                item
+            )
 
-        elif isinstance(item, dict):
+        elif isinstance(
+            item,
+            dict
+        ):
 
             item_id = item.get(
                 "id"
             )
 
             if item_id:
-                posted_ids.add(item_id)
+
+                posted_ids.add(
+                    item_id
+                )
 
             recent_articles.append(
                 item
@@ -1218,13 +1733,14 @@ def select_article(
         )
 
         if article_id in posted_ids:
+
             continue
 
-        # Protect against same/similar topic
         if is_same_topic(
             article,
             recent_articles
         ):
+
             continue
 
         candidates.append(
@@ -1249,17 +1765,22 @@ def add_to_history(
 
     history.append({
 
-        "id": article_id,
+        "id":
+            article_id,
 
-        "title": article["title"],
+        "title":
+            article["title"],
 
-        "source": article["source"],
+        "source":
+            article["source"],
 
-        "link": article["link"],
+        "link":
+            article["link"],
 
-        "posted_at": time.strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        "posted_at":
+            time.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
 
     })
 
@@ -1299,7 +1820,7 @@ def main():
     )
 
     # ---------------------------------
-    # Remove exact duplicates
+    # Remove duplicates
     # ---------------------------------
 
     articles = remove_duplicates(
@@ -1311,7 +1832,7 @@ def main():
     )
 
     # ---------------------------------
-    # Find fresh + different topics
+    # Find fresh topics
     # ---------------------------------
 
     new_articles = select_article(
@@ -1332,7 +1853,7 @@ def main():
         return
 
     # ---------------------------------
-    # Select first suitable article
+    # Select article
     # ---------------------------------
 
     article = new_articles[0]
@@ -1384,7 +1905,7 @@ def main():
     )
 
     # ---------------------------------
-    # Validate safety / quality
+    # Validate
     # ---------------------------------
 
     validation_errors = validate_post(
@@ -1414,19 +1935,26 @@ def main():
     # Show final post
     # ---------------------------------
 
-    print("\n" + "=" * 60)
+    print(
+        "\n"
+        + "=" * 60
+    )
 
     print(
         "GENERATED POST"
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         post
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     # ---------------------------------
     # Publish
