@@ -40,6 +40,7 @@ jobs:
       - name: Run Binance Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python agent.py
@@ -51,6 +52,7 @@ jobs:
 
           if [ -f posted_news.json ]; then
             git add posted_news.json
+
             if git diff --cached --quiet; then
               echo "No history changes to commit."
             else
